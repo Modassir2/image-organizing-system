@@ -240,12 +240,13 @@ if __name__=="__main__":
                     if len(per_img_time) > 100:
                         per_img_time = per_img_time[-99:]
 
-                    #Custom Logic Here For Future Moda:
+                    
                     if category == "skip":
                         utils.log(level="WARN",line=f"Skipping image {count} - {img} due to BadRequestError [{os.path.abspath(path)}]")
                         continue
-                    if category=="not_documents":
-                        continue
+                    #Custom Category Logic Here:
+                    #if category=="x":
+                    #    continue #Skips and ignores if category = "x"
                     #----------------------------------
 
                     save_category = os.path.join(save,category)

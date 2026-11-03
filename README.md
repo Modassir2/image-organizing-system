@@ -1,6 +1,6 @@
 # Image Organizing System
 
-Point it at a folder full of images. A vision model reads each one and files it into the right category, live progress and all.
+Point it at a folder full of images. A vision model reads each one and files it into the categories **you** define — live progress and all.
 
 Works with **any OpenAI-compatible vision endpoint** — a local `llama.cpp` server, Ollama, LM Studio, vLLM, or a cloud API. Run it fully offline and your images never leave your machine.
 
@@ -18,7 +18,7 @@ Estimated Time Remaining:      4 Min(s) 12 Sec  [7.4 sec per Image]
 
 - **Local-first.** With a local server, no image or prompt ever leaves your machine. Nothing is uploaded, nothing is logged by a third party.
 - **Copy, never move.** Your originals stay exactly where they are. Sorted files land in `output/<category>/`.
-- **Custom categories.** They live in one JSON file. Change the list, update one Markdown file, and the model follows.
+- **Bring your own categories.** Any list you write in one JSON file, described in one Markdown file. Nothing is hardcoded — documents, screenshots, receipts, memes, whatever you actually have. Need a category handled differently? There's a per-category hook in `main.py`.
 - **No silent failures.** Every warning and error goes to a JSON-lines log you can actually parse.
 - **Resumable.** Interrupted a 5,000 image run? Restart and pick up where you stopped.
 - **Handles flaky setups.** Unplugged the external drive mid-run? It waits and retries instead of dying. Server dropped? Same.
@@ -198,7 +198,9 @@ The same config shape works for Groq, Together, OpenRouter, and other OpenAI-com
 
 ## Categories
 
-Categories are defined in `categories.json`:
+**You define the categories, not the app.** Nothing in the code knows the word "medical" or "legal" — the five labels shipped in `categories.json` are just a starting point for document sorting. Swap them for anything you want to organize by: `receipts`, `screenshots`, `memes`, `wallpapers`, `pets`, `whiteboards`.
+
+Categories live in `categories.json`:
 
 ```json
 {
@@ -212,41 +214,86 @@ Categories are defined in `categories.json`:
 }
 ```
 
-This list is injected straight into the tool schema as an `enum`, so it is the single source of truth for what the model is allowed to output. Each category becomes a folder under `save_location`.
+This list is injected straight into the tool schema as an `enum`. That makes it the single source of truth for what the model is allowed to answer, and every category becomes a folder under `save_location`. A completely different set works the same way, with no code changes:
 
-`instructions.md` explains what those labels *mean*. That's where the real accuracy comes from — describe your categories in plain language, with concrete examples and tie-breakers:
+```json
+{
+  "categories": ["receipts", "screenshots", "memes", "wallpapers", "other"]
+}
+```
+
+`instructions.md` explains what the labels *mean*. That's where the real accuracy comes from — describe each category in plain language, with concrete examples and a tie-breaker:
 
 ```markdown
-- `medical_documents`: prescriptions, medical reports, lab results, health records.
-- `legal_documents`: contracts, court papers, legal notices, deeds, wills.
-- `not_documents`: photographs, artwork, scenery, objects, people — anything not a document.
+- `receipts`: photos of purchase receipts, invoices, order confirmations.
+- `screenshots`: phone or desktop UI captures, chat screenshots, app screens.
+- `memes`: joke images, image macros, reaction pictures.
+- `wallpapers`: artwork or scenery meant to be used as a background.
+- `other`: anything that doesn't clearly fit the above.
 ```
 
 If `instructions.md` is missing, the app falls back to `Sort the given image.` — which works, but is vague.
 
-### Adding your own category
+### Rules for category names
+
+- **Exact strings.** Case, spaces, punctuation, and accents are preserved. `Receipts` and `receipts` are two different categories.
+- **Don't use `skip`.** It's reserved. The app returns `"skip"` internally when a model rejects an image three times, so a category with that name is never copied.
+- **Folder-safe characters only.** Every label becomes a directory name, so avoid `\ / : * ? " < > |`.
+- **Restart after editing.** Categories are read once at startup.
+
+### Adding a category
 
 1. Add the label to `categories.json`.
 2. Add a line describing it to `instructions.md`.
 3. Restart the script.
 
-Labels are matched exactly. Keep them lowercase with underscores if you want tidy folder names, and never rename a label mid-run — old folders won't merge.
+Never rename a label mid-run — old folders won't merge.
 
-### `not_documents` is skipped
+### Custom logic per category
 
-Anything classified as `not_documents` is **left where it is** — no folder is created for it. That's intentional: the tool is meant to pull documents out of a messy camera roll.
-
-Want it copied anyway? In `main.py`, find:
+By default every image is copied to `save_location/<category>/`. When a category needs different behaviour, `main.py` has a hook immediately before the copy:
 
 ```python
-#Custom Logic Here For Future Moda:
 if category == "skip":
-    ...
-if category=="not_documents":
+    utils.log(level="WARN", line=f"Skipping image {count} - {img} due to BadRequestError [...]")
+    continue
+#Custom Category Logic Here:
+#if category=="x":
+#    continue #Skips and ignores if category = "x"
+#----------------------------------
+
+save_category = os.path.join(save, category)
+copy(source=path, destination_dir=save_category)
+```
+
+At that point `category`, `img`, `path`, `root`, `count` and `save` are all in scope. `continue` skips the image and leaves it in place; anything else falls through to the two lines that do the copying.
+
+**Leave a category where it is** — uncomment the shipped example and swap `x`:
+
+```python
+if category == "not_documents":
     continue
 ```
 
-Remove the `not_documents` branch and those images get filed like everything else. This block is the intended hook for custom rules.
+**Group several categories into one folder** — replace the last two default lines with:
+
+```python
+if category in ("medical_documents", "legal_documents"):
+    save_category = os.path.join(save, "sensitive")
+else:
+    save_category = os.path.join(save, category)
+copy(source=path, destination_dir=save_category)
+```
+
+**Prefix filenames with their category** — replace the `copy(...)` line with:
+
+```python
+copy(source=path, destination_dir=save_category, name=f"{category}_{img}")
+```
+
+`copy()` accepts `name=`, so you can rename on the way out without touching the original. Only ever call it once per image, or you'll write the file twice.
+
+Keep the `skip` branch above your own rules — it's how the three-strikes `BadRequestError` fallback stays quiet.
 
 ---
 
@@ -264,6 +311,7 @@ output/
 ```
 
 - Files are **copied**, so the source folder is never modified.
+- Every category the model returns gets its own folder — including `not_documents`. To leave a category's images where they are, add a rule with the [custom logic](#custom-logic-per-category) hook.
 - A name collision in the destination becomes `name(1).ext`, `name(2).ext`, and so on.
 - `save_location` is resolved relative to the project folder, not the image folder.
 
@@ -315,6 +363,7 @@ image-organizing-system/
 ├── config.json           # your real config — do not commit
 ├── requirements.txt
 ├── run.bat               # Windows one-click launcher
+├── LICENSE               # MIT
 └── logs.log              # JSON-lines run log (generated)
 ```
 
@@ -366,4 +415,4 @@ Issues and PRs are welcome. If you're changing classification behaviour, keep `c
 
 ## License
 
-No license has been added to this repository yet.
+Released under the [MIT License](LICENSE) — free to use, modify, and redistribute as long as the copyright notice is kept.
