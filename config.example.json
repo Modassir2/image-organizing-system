@@ -1,6 +1,6 @@
 {
   "base_url": "http://127.0.0.1:8002/v1",
-  "model": "qwen3.5_2b",
+  "model": "qwen3.5:2b",
   "api_key": "local",
   "save_location": "./output",
   "connection_retry": 10

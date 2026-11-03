@@ -153,8 +153,8 @@ console = Console()
 
 if __name__=="__main__":
     try:
-        utils.log(line="Image sorting started.")
-        console.print(Markdown("# Image Sorting System"),style="red")
+        utils.log(line="Image organizing started.")
+        console.print(Markdown("# Image Organizing System"),style="red")
         console.print(f"Save Location: '{save}'",style="cyan")
         console.print(f"Categories Found: {utils.categories}",style="yellow")
         console.print(f"Logs: '{utils.log_path}'",style="red")
@@ -252,7 +252,7 @@ if __name__=="__main__":
                     copy(source=path,destination_dir=save_category)
                     category = None
 
-        console.print("Image Sorting completed!")
+        console.print("Image Organizing completed!")
         time.sleep(5)
         input("Press Enter to exit...")
 

@@ -1,4 +1,4 @@
-# Image Sorting System
+# Image Organizing System
 
 Point it at a folder full of images. A vision model reads each one and files it into the right category, live progress and all.
 
@@ -61,15 +61,15 @@ The sweet spot for this tool — small enough to run on a laptop (CPU included),
 
 Need higher accuracy on dense or low-quality scans? Step up to a larger vision model. Need more speed? Use a quantized build — just keep the same model ID.
 
-Naming varies by server: Ollama reports `qwen3.5:2b`, while some llama.cpp builds report `qwen3.5_2b`. The `model` field must match your server exactly — check `ollama list` or the llama-server startup log.
+Naming varies by server — some builds report `qwen3.5:2b`, others use different punctuation. Copy the exact ID from `ollama list` or the llama-server startup log into `model`.
 
 ---
 
 ## Quick start
 
 ```bash
-git clone https://github.com/<your-username>/image-sorting-system.git
-cd image-sorting-system
+git clone https://github.com/Modassir2/image-organizing-system.git
+cd image-organizing-system
 ```
 
 **Windows (PowerShell)**
@@ -306,7 +306,7 @@ The file grows across runs — delete it whenever you like.
 ## Project structure
 
 ```
-image-sorting-system/
+image-organizing-system/
 ├── main.py               # CLI, progress UI, copy logic, retry handling
 ├── utils.py              # config loading, logging, tool schema, system prompt
 ├── categories.json       # allowed labels (feeds the tool enum)
